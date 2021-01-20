@@ -5,6 +5,9 @@ let USER_LANG = 'en';
 let BASE = location.protocol + '//' + location.host + location.pathname;
 
 $(document).ready(function () {
+    //getSubregisterUris();
+
+
     let vocProjects = new Map(); //key of vocProjects is identical with URI path!
     addVocProj(vocProjects); //-> var assigned in projects.js
     let urlParams = new URLSearchParams(window.location.search);
@@ -19,52 +22,64 @@ $(document).ready(function () {
         $('#pageContent').empty();
         details('pageContent', uri);
         if (uri.indexOf('geoscience') > 0) {
-            insertProjCards('proj_links', vocProjects, uri.split('\/')[5]);
+            //insertProjCards('proj_links', vocProjects, uri.split('\/')[5]);
+            setProjBox([`${uri.split('\/')[5]}`], 'proj_links');
         }
 
     } else {
-        insertPageDesc(); //general intro
+        //insertPageDesc(); //general intro
         insertVocDesc(vocProjects, 'proj_desc');
-        insertProjCards('proj_links', vocProjects);
+        setProjBox(['eurolithos','hike','hotlime','hover','muse'], 'proj_links');
+        //insertProjCards('proj_links', vocProjects);
     }
-
-    initSearch(); //provides js for fuse search
+    initSearch(Array.from(vocProjects.keys())); //provides js for fuse search
 });
 
-//********set the title of PV homepage********************************************************************
 
-function insertPageDesc() {
+//********set the title of PV homepage****************************************
+
+/*function insertPageDesc() {
 
     $('#page_desc').append('<br><h1 id="title">GeoERA Project Vocabularies</h1>');
     $('#page_desc').append('<h4>EGDI - European Geological Data Infrastructure</h4>');
     $('#page_desc').append('<p>Establishing the European Geological Surveys Research Area to deliver a Geological Service for Europe</p>');
-}
+}*/
 
-//*********************descriptions insert of vocabularies for the start page******************************
+//**********descriptions insert of vocabularies for the start page********************
 
-function insertVocDesc(vocProjects, divID) { //?????????????????????? SCRIPT überarbeiten
+function insertVocDesc(vocProjects, divID) {
 
-    let query = encodeURIComponent(`PREFIX dcterms:<http://purl.org/dc/terms/>
-                                    PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
-                                    SELECT ?cs ?Title ?Desc (COUNT(?c) AS ?count) (GROUP_CONCAT(DISTINCT ?L; separator = "|") as ?topConcepts) ?modified
-                                    WHERE { SELECT * {
-                                    ?cs a skos:ConceptScheme; skos:hasTopConcept ?tc; dcterms:title ?Title . FILTER(lang(?Title)="en")
-                                    OPTIONAL {?cs dcterms:description ?D . FILTER(lang(?D)="en")}
-                                    OPTIONAL {?cs dcterms:created ?r}
-                                    OPTIONAL {?cs dcterms:modified ?m}
-                                    ?tc skos:narrower* ?c; skos:prefLabel ?tcl .
-                                    FILTER(lang(?tcl)="en")
-                                    BIND(CONCAT(STR(?tc),"$",STR(?tcl)) AS ?L)
-                                    BIND(COALESCE(?D, "") AS ?Desc)
-                                    BIND(COALESCE(?r, ?m, "") AS ?modified)
-                                    } ORDER BY ?tcl
-                                    }
-                                    GROUP BY ?cs ?Title ?Desc ?modified`);
+    //only SKOS ConceptSchemes with TopConcepts Concepts and prefLabels!
+    //within TOPREGISTERS
 
-    fetch(ENDPOINT + '?query=' + query + '&format=application/json')
+    let query = encodeURIComponent(`prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                        prefix dct: <http://purl.org/dc/terms/>
+                        prefix skos: <http://www.w3.org/2004/02/skos/core#>
+                        prefix version: <http://purl.org/linked-data/version#>
+                        prefix reg: <http://purl.org/linked-data/registry#>
+
+                        SELECT ?status ?projName ?cs ?Title ?Desc ?modified (COUNT(DISTINCT(?s)) AS ?count)
+                        (GROUP_CONCAT(DISTINCT ?L; separator = "|") as ?topConcepts)
+                        WHERE {
+                          ?a dct:isVersionOf <${TOPREGISTERS[0]}>; reg:subregister ?proj.
+                          ?b dct:isVersionOf ?proj; reg:subregister ?cs; rdfs:label ?projName .
+                          ?cs version:currentVersion ?c .
+                          ?d reg:definition ?e; reg:status ?status . ?e reg:entity ?cs .
+                          ?f version:currentVersion ?d .
+                          ?c rdfs:label ?Title .
+                          OPTIONAL{?c dct:description ?Desc}
+                          OPTIONAL{?c dct:modified ?modified}
+                          #need for SKOS prefLabel
+                          ?tc skos:topConceptOf ?cs; skos:narrower* ?s; skos:prefLabel ?tcl FILTER(lang(?tcl)="en")
+                          BIND(CONCAT(STR(?tc),"$",STR(?tcl)) AS ?L)
+                        }
+                        GROUP BY ?projName ?cs ?Title ?Desc ?modified ?status`);
+
+    fetch(ENDPOINT + '?query=' + query + '&format=json')
 
         .then(res => res.json())
-        .then(jsonData => { //console.log(jsonData);
+        .then(jsonData => {
+            //console.log(jsonData.results.bindings);
             for (let [key, value] of vocProjects.entries()) {
                 let uri_path = new RegExp(key);
                 jsonData.results.bindings.filter(item => uri_path.test(item.cs.value)).forEach(function (item) {
@@ -84,9 +99,12 @@ function insertVocDesc(vocProjects, divID) { //?????????????????????? SCRIPT üb
                                             <br>
                                             <strong>Concepts:</strong> <span class="badge badge-info badge-pill">${item.count.value}</span>
                                             &nbsp;&nbsp;&nbsp;
-                                            <strong>Created:</strong> ${item.modified.value.split('T')[0]}
+                                            <strong>Modified:</strong> ${item.modified.value.split('T')[0]}
                                             &nbsp;&nbsp;&nbsp;
-                                            <strong>Codelist:</strong> <a href="${ENDPOINT}?query=${encodeURIComponent(CODELIST_QUERY.replace(/§/g,item.cs.value))}&format=text/html">HTML</a>
+                                            <strong>Codelist:</strong> <a href="${ENDPOINT}?query=${encodeURIComponent(CODELIST_QUERY.replace(/§/g,item.cs.value))}&format=CSV">CSV</a>, <a href="${ENDPOINT}?query=${encodeURIComponent(CODELIST_QUERY.replace(/§/g,item.cs.value))}&format=TSV">TSV</a>
+                                            &nbsp;&nbsp;&nbsp;
+                                            <strong>Status:</strong> ${item.status.value.replace('http://purl.org/linked-data/registry#status','')}
+
                                         </p>
                                     </div>
                                 </div>`);
@@ -98,35 +116,37 @@ function insertVocDesc(vocProjects, divID) { //?????????????????????? SCRIPT üb
 //***********************HTML Table download***************************************
 
 let CODELIST_QUERY = `PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
-select (IF(contains(str(?s), "§"), ?s, CONCAT("\u003Cspan style='color:red;'\u003E",str(?s),"\u003C\u002Fspan\u003E")) as ?URI)
-(concat("<a href='https://schmar00.github.io/project-vocabularies/?uri=",str(?s),"'>",str(?L),"</a>") as ?Label)
+select ?URI ?Label
+(GROUP_CONCAT(distinct ?n; separator = '; ') as ?Notation)
 (GROUP_CONCAT(distinct ?D; separator = '; ') as ?Definition)
 (GROUP_CONCAT(distinct ?P; separator = '; ') as ?Parents)
 (GROUP_CONCAT(distinct ?N; separator = '; ') as ?scopeNote)
 where {
-<§> skos:hasTopConcept ?tc .
-?tc skos:narrower* ?s . ?s skos:prefLabel ?L filter(lang(?L)="en")
-optional {?s skos:definition ?D filter(lang(?D)="en")}
-optional {?s skos:scopeNote ?N filter(lang(?N)="en")}
-optional {?s skos:broader ?o . ?o skos:prefLabel ?P filter(lang(?P)="en")}
-}
-group by ?s ?L
-order by ?L`;
-
-let CONCEPTSLIST_QUERY = `PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
-select ?URI
-(concat("<a href='https://schmar00.github.io/project-vocabularies/?uri=",str(?URI),"'>",str(?L),"</a>") as ?Label)
-(GROUP_CONCAT(distinct ?D; separator = '; ') as ?Definition)
-(GROUP_CONCAT(distinct ?P; separator = '; ') as ?Parents)
-(GROUP_CONCAT(distinct ?N; separator = '; ') as ?scopeNote)
-where {
-<§> skos:narrower* ?URI . ?URI skos:prefLabel ?L filter(lang(?L)="en")
+?tc skos:topConceptOf <§>; skos:narrower* ?URI .
+?URI skos:prefLabel ?Label filter(lang(?Label)="en")
+optional {?URI skos:notation ?n}
 optional {?URI skos:definition ?D filter(lang(?D)="en")}
 optional {?URI skos:scopeNote ?N filter(lang(?N)="en")}
 optional {?URI skos:broader ?o . ?o skos:prefLabel ?P filter(lang(?P)="en")}
 }
-group by ?URI ?L
-order by ?L`;
+group by ?URI ?Label
+order by ?Label`;
+
+let CONCEPTSLIST_QUERY = `PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
+select ?URI ?Label
+(GROUP_CONCAT(distinct ?n; separator = '; ') as ?Notation)
+(GROUP_CONCAT(distinct ?D; separator = '; ') as ?Definition)
+(GROUP_CONCAT(distinct ?P; separator = '; ') as ?Parents)
+(GROUP_CONCAT(distinct ?N; separator = '; ') as ?scopeNote)
+where {
+<§> skos:narrower* ?URI . ?URI skos:prefLabel ?Label filter(lang(?Label)="en")
+optional {?URI skos:notation ?n}
+optional {?URI skos:definition ?D filter(lang(?D)="en")}
+optional {?URI skos:scopeNote ?N filter(lang(?N)="en")}
+optional {?URI skos:broader ?o . ?o skos:prefLabel ?P filter(lang(?P)="en")}
+}
+group by ?URI ?Label
+order by ?Label`;
 
 
 //***********************set the input box for concept search****************************************
@@ -182,7 +202,7 @@ function insertSearchCard(widgetID) {
 
 //**********************the initial sparql query to build the fuse (trie) object - stored in window*****************************
 
-function initSearch() {
+function initSearch(projectArr) {
 
     let query = encodeURIComponent(`PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
                                     PREFIX dcterms:<http://purl.org/dc/terms/>
@@ -190,15 +210,15 @@ function initSearch() {
                                     SELECT ?s ?L
                                     WHERE {
                                     VALUES ?p {skos:prefLabel skos:altLabel}
-                                    ?s a skos:Concept; ?p ?lEN . FILTER(lang(?lEN)="en")
-                                    FILTER(!regex(str(?lEN), "\\\\["))
-                                    FILTER NOT EXISTS {?s rdf:type dcterms:BibliographicResource}
-                                    OPTIONAL{?s ?p ?l . FILTER(lang(?l)="${USER_LANG}")}
-                                    BIND(COALESCE(?l, ?lEN) AS ?L)
+                                    ?cs a skos:ConceptScheme . FILTER(regex(str(?cs),"${projectArr.join('") || regex(str(?cs),"')}")) .
+                                    ?tc skos:topConceptOf ?cs; skos:narrower* ?s .
+                                    ?s ?p ?L . FILTER(lang(?L)="en") FILTER(!regex(str(?L), "\\\\["))
                                     }
                                     ORDER BY STRLEN(STR(?L)) ?L`);
 
-    fetch(ENDPOINT + '?query=' + query + '&format=application/json')
+    //console.log(projectArr.join('") || regex(str(?cs),"'));
+
+    fetch(ENDPOINT + '?query=' + query + '&format=json')
         .then(res => res.json())
         .then(jsonData => {
             const options = {
@@ -247,24 +267,20 @@ function search(searchText, vocProjects) {
 
     //NEU*******************************
     let query = encodeURIComponent(`PREFIX dcterms:<http://purl.org/dc/terms/>
-                                    PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
-                                    SELECT DISTINCT ?s ?title ?text
-                                    WHERE {
-                                    VALUES ?n {"${sparqlEncode(searchText.toLowerCase())}"}
-                                    VALUES ?p {skos:prefLabel skos:altLabel skos:definition skos:scopeNote dcterms:description}
-                                    ?s a skos:Concept; ?p ?lEN . FILTER((lang(?lEN)="en"))
-                                    OPTIONAL{?s ?p ?l . FILTER(lang(?l)="${USER_LANG}")}
-                                    BIND(COALESCE(?l, ?lEN) AS ?L) . FILTER(regex(?L,?n,"i"))
-                                    ?s skos:prefLabel ?plEN . FILTER((lang(?plEN)="en"))
-                                    OPTIONAL{?s skos:prefLabel ?pl . FILTER(lang(?pl)="${USER_LANG}")}
-                                    BIND(COALESCE(?pl, ?plEN) AS ?title)
-                                    BIND(CONCAT(STR(?p),"|",STR(?L)) AS ?text)
-                                    BIND(IF(?p=skos:prefLabel,1,2) AS ?sort)
-                                    }
-                                    ORDER BY ?sort
-                                    LIMIT 100`);
-
-    fetch(ENDPOINT + '?query=' + query + '&format=application/json')
+                    PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
+                    SELECT DISTINCT ?s ?title ?text
+                    WHERE {
+                    VALUES ?n {"${sparqlEncode(searchText.toLowerCase())}"}
+                    VALUES ?p {skos:prefLabel skos:altLabel skos:definition skos:scopeNote}
+                    ?s a skos:Concept; ?p ?l; skos:prefLabel ?title .
+                    FILTER(!regex(str(?s),"keyword") && regex(?l,?n,"i") && lang(?title)="en")
+                    BIND(CONCAT(STR(?p),"|",STR(?l)) AS ?text)
+                    BIND(IF(?p=skos:prefLabel,1,2) AS ?sort)
+                    }
+                    ORDER BY ?sort
+                    LIMIT 100`);
+console.log(decodeURIComponent(query));
+    fetch(ENDPOINT + '?query=' + query + '&format=json')
         .then(res => res.json())
         .then(jsonData => { //console.log(jsonData);
             jsonData.results.bindings.forEach(function (a) { // insert project name ${vocProjects.get(a.s.value.split('\/')[3]).acronym}
@@ -281,7 +297,7 @@ function search(searchText, vocProjects) {
                                         </a>
                                         <br>
                                         <span class="searchPropTyp">URI: </span>
-                                        <span class="searchResultURI text-info">
+                                        <span class="searchResultURI">
                                             ${a.s.value}
                                         </span>
                                         <br>
@@ -336,7 +352,9 @@ const n = {
     rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
     gc3d: 'http://resource.geolba.ac.at/schema/geoconnect3d#',
     schema: 'https://schema.org/',
-    geosparql: 'http://www.opengis.net/ont/geosparql#'
+    geosparql: 'http://www.opengis.net/ont/geosparql#',
+    version: 'http://purl.org/linked-data/version#',
+    reg: 'http://purl.org/linked-data/registry#'
 };
 
 const PREF_LABEL = [n.skos + 'prefLabel'];
@@ -355,10 +373,10 @@ const RELATIONS_EGDI = [n.gc3d + 'limitedBy', n.gc3d + 'limitTo', n.geosparql + 
 const WEB_LINK = [n.dcterms + 'source', n.dcterms + 'isReferencedBy', n.dcterms + 'subject', n.dcterms + 'isRequiredBy', n.dcterms + 'identifier', n.foaf + 'isPrimaryTopicOf', n.schema + 'subjectOf', n.foaf + 'page', n.schema + 'hasMap'];
 const ICONS = [n.foaf + 'isPrimaryTopicOf', n.schema + 'subjectOf', n.foaf + 'page', n.dcterms + 'isPartOf', n.dcterms + 'hasPart'];
 const MAPS = [n.schema + 'hasMap'];
-const appIcons = ['<i style="color:#3498DB;" class="fab fa-twitter"></i>', '<i style="color:#3498DB;" class="fas fa-blog"></i>', '<i style="color:#3498DB;" class="fab fa-youtube"></i>', '<i style="color:#3498DB;" class="fab fa-wikipedia-w"></i>'];
+const appIcons = ['<i style="color:#719430;" class="fab fa-twitter"></i>', '<i style="color:#719430;" class="fas fa-blog"></i>', '<i style="color:#719430;" class="fab fa-youtube"></i>', '<i style="color:#719430;" class="fab fa-wikipedia-w"></i>'];
 const VISUALIZATION = [n.dbpo + 'colourHexCode'];
 const LOCATION = [n.geo + 'lat', n.geo + 'long', n.geo + 'location', n.dcterms + 'spatial'];
-const CREATOR = [n.dcterms + 'creator', n.dcterms + 'contributor', n.dcterms + 'created', n.dcterms + 'modified'];
+const CREATOR = [n.version + 'currentVersion', n.dcterms + 'creator', n.dcterms + 'contributor', n.dcterms + 'created', n.dcterms + 'modified'];
 
 const FRONT_LIST = {
     prefLabel: PREF_LABEL,
@@ -393,24 +411,36 @@ function rdfTS(v) {
 function details(divID, uri) { //build the web page content
     $('#' + divID).append(`<form id="irdfForm" target="_blank" style="display:none;" method="post" action="${ENDPOINT}"><input type="hidden" name="query" id="irdfQuery"/></form>`);
 
-    let query = encodeURIComponent(`PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
-        SELECT DISTINCT ?p ?o (GROUP_CONCAT(DISTINCT CONCAT(STR(?L), "@", lang(?L)) ; separator="|") AS ?Label)
-        (COUNT(distinct(?sr)) AS ?count) (GROUP_CONCAT(?source ; separator="|") AS ?pdf)
-        WHERE {
-        VALUES ?s {<${uri}>}
-        {?s ?p ?o .
-        OPTIONAL {?o skos:prefLabel ?L}
-        OPTIONAL {?o skos:narrower|skos:related ?sr}
-        }UNION{
-        VALUES ?p {<http://purl.org/dc/terms/bibliographicCitation>}
-        ?s ?x ?r . ?r ?p ?o
-        OPTIONAL{?r <http://purl.org/dc/terms/source> ?source}
-        }
-        }
-        GROUP BY ?p ?o
-        ORDER BY ?Label`);
+    //#####################################################################
+    //PROBLEM: es gibt den Link zur References, aber noch keine Daten dazu -> Fehler in 507
+    //#####################################################################
 
-    fetch(ENDPOINT + '?query=' + query + '&format=application/json')
+
+    let query = encodeURIComponent(`PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
+                PREFIX reg: <http://purl.org/linked-data/registry#>
+                PREFIX version: <http://purl.org/linked-data/version#>
+                SELECT DISTINCT ?p ?o
+                (COALESCE(GROUP_CONCAT(DISTINCT CONCAT(STR(?L), "@", lang(?L)) ; separator="|"), "") AS ?Label)
+                (COUNT(distinct(?sr)) AS ?count) (COALESCE(GROUP_CONCAT(?source ; separator="|"), "") AS ?pdf)
+                WHERE {
+                VALUES ?s {<${uri}>}
+                {?s ?p ?o .
+                OPTIONAL {?o skos:prefLabel ?L}
+                OPTIONAL {?o skos:narrower|skos:related ?sr}
+                }UNION{
+                VALUES ?p {<http://purl.org/dc/terms/bibliographicCitation>}
+                ?s ?x ?r . ?r ?p ?o
+                OPTIONAL{?r <http://purl.org/dc/terms/source> ?source}
+                }UNION{
+                ?d reg:definition ?e; reg:status ?o .
+                ?e reg:entity ?s . ?f version:currentVersion ?d
+                BIND(version:currentVersion AS ?p)
+                }
+                }
+                GROUP BY ?p ?o
+                ORDER BY ?Label`);
+
+    fetch(ENDPOINT + '?query=' + query + '&format=json')
         .then(res => res.json())
         .then(jsonData => {
 
@@ -429,7 +459,7 @@ function details(divID, uri) { //build the web page content
                             width="17" />
                             </span>
                         </a>
-                        <a href="${ENDPOINT}?query=${encodeURIComponent(CONCEPTSLIST_QUERY.replace('§', uri))}&format=text/html" title="HTML list">
+                        <a href="${ENDPOINT}?query=${encodeURIComponent(CONCEPTSLIST_QUERY.replace('§', uri))}&format=TSV" title="download TSV table">
                             <span style="margin-right:15px;">
                                 <i class="far fa-list-alt"></i>
                             </span>
@@ -480,6 +510,8 @@ function toggleRead(divBtn, divTxt, text) {
 
 function createFrontPart(divID, uri, data, props) {
 
+
+    //console.log(data.results.bindings);
     let sourceLinks = data.results.bindings.map(a => [a.pdf.value, a.o.value]).filter(b => b[0].length > 0);
     //console.log(sourceLinks);
 
@@ -537,7 +569,7 @@ function createFrontPart(divID, uri, data, props) {
                         }
                         if (!iconExists) {
                             html += `<span style="margin: 5px;">
-                                    ${i.split('>')[0]+'><i style="color:#3498DB;" class="fas fa-paperclip"></i></a>'}
+                                    ${i.split('>')[0]+'><i style="color:#719430;" class="fas fa-paperclip"></i></a>'}
                                 </span>`;
                         }
                     }
@@ -547,7 +579,7 @@ function createFrontPart(divID, uri, data, props) {
                     html += '<div style="float:right;" id="mapsInsert">';
                     for (let i of ul) {
                         html += `<span style="margin: 5px;">
-                                    ${i.split('>')[0]+'><i style="color:#3498DB;" class="fas fa-map"></i></a>'}
+                                    ${i.split('>')[0]+'><i style="color:#719430;" class="fas fa-map"></i></a>'}
                                 </span>`;
                     }
                     html += `</div>`;
@@ -556,7 +588,7 @@ function createFrontPart(divID, uri, data, props) {
                     html += '<hr><div class="' + key + '">' + setUserLang(Array.from(ul).join('|').replace(/  <span class="lang">/g, '@').replace(/<\/span>/g, '')) + '</div>';
                     break;
                 case 'scope':
-                    html += '<br><p class="text-secondary">Interpretation: ' + setUserLang(Array.from(ul).join('|').replace(/  <span class="lang">/g, '@').replace(/<\/span>/g, '')) + '</p>';
+                    html += '<br><p class="text-sec">Interpretation: ' + setUserLang(Array.from(ul).join('|').replace(/  <span class="lang">/g, '@').replace(/<\/span>/g, '')) + '</p>';
                     break;
                 case 'citation':
                     let a = []; //console.log(ul);
@@ -617,17 +649,19 @@ function shortenText(htmlText) {
 
     let abbrev = {
         INSPIRE: 'http://inspire.ec.europa.eu/codelist/',
-        INSPIRE: 'http://inspire.ec.europa.eu/featureconcept/',
+        INSPIRE_fc: 'http://inspire.ec.europa.eu/featureconcept/',
         CGI: 'http://resource.geosciml.org/classifier/cgi/',
         CGI: 'http://resource.geosciml.org/classifier/cgi/faulttype/',
-        ICS: 'http://resource.geosciml.org/classifier/ics/',
+        ICS: 'http://resource.geosciml.org/classifier/ics/ischart/',
         DBpedia: 'http://dbpedia.org/resource/',
         nlDBpedia: 'http://nl.dbpedia.org/resource/',
         BGS: 'http://data.bgs.ac.uk/id/EarthMaterialClass/',
         WIKIDATA: 'http://www.wikidata.org/entity/',
         GBA: 'http://resource.geolba.ac.at/',
         GeoConnect3D: 'https://data.geoscience.earth/ncl/geoera/geoconnect3d/',
-        GeoERA: 'https://data.geoscience.earth/ncl/geoera/'
+        GeoERA: 'https://data.geoscience.earth/ncl/geoera/',
+        BGR: 'https://vocabulary.bgr.de/',
+        GEMET: 'http://www.eionet.europa.eu/gemet/concept/'
     };
     for (let i in abbrev) {
         htmlText = htmlText.split('>' + abbrev[i]).map(a => a.replace('<', ` (${i})<`)).join('>').replace(` (${i})`, '');
@@ -741,6 +775,62 @@ function setUserLang(x) {
 }
 
 //********************************************************************************************************
+function setProjBox(projAbbrev, divID) {
+
+       let query = encodeURIComponent(`prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                                        prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                                        prefix dct: <http://purl.org/dc/terms/>
+                                        prefix foaf: <http://xmlns.com/foaf/0.1/>
+                                        prefix skos: <http://www.w3.org/2004/02/skos/core#>
+                                        prefix version: <http://purl.org/linked-data/version#>
+                                        prefix cerif: <http://purl.org/cerif/frapo/>
+                                        prefix time: <http://www.w3.org/2006/time#>
+                                        prefix reg: <http://purl.org/linked-data/registry#>
+                                        prefix schema: <https://schema.org/>
+                                        select ?s ?n (COALESCE(MIN(?L), "") AS ?Label)
+                                        (COALESCE(MIN(?page1), "") AS ?page)
+                                        (COALESCE(MIN(?description1), "") AS ?description)
+                                        (COALESCE(MIN(?primaryTopic1), "") AS ?primaryTopic)
+                                        (COALESCE(MIN(?sameAs1), "") AS ?cordis)
+                                        (COALESCE(MIN(?years1), "") AS ?years)
+                                        (COALESCE(MIN(?isFundedBy1), "") AS ?isFundedBy)
+                                        where {
+                                        ?s a foaf:Project; skos:notation ?n; skos:prefLabel ?L .
+                                        FILTER(lcase(?n)="${projAbbrev.join('" || lcase(?n)="')}")
+                                          OPTIONAL{?s foaf:page ?page1}
+                                          OPTIONAL{?s dct:description ?description1}
+                                          OPTIONAL{?s foaf:primaryTopic ?primaryTopic1}
+                                          OPTIONAL{?s schema:sameAs ?sameAs1}
+                                          OPTIONAL{?s time:years ?years1}
+                                          OPTIONAL{?s cerif:isFundedBy ?isFundedBy1}
+                                        }
+                                        GROUP BY ?s ?n`);
+
+    fetch(ENDPOINT + '?query=' + query + '&format=json')
+
+        .then(res => res.json())
+        .then(jsonData => {
+            //console.log(jsonData.results.bindings);
+        for (let a of jsonData.results.bindings) {
+            $('#' + divID).append(`
+                <div class="card my-4">
+                    <h5 class="card-header">
+                        <strong>${a.n.value}</strong> (${a.years.value})
+                    </h5>
+                    <div class="card-body">
+                        subject: ${a.primaryTopic.value}<br>
+                        URI: <a href="${a.s.value}">${a.s.value}</a>
+                        ${a.Label.value}<br>
+                        Website: <a href="${a.page.value}">${a.page.value}</a><br>
+                        funded by: <a href="${a.cordis.value}">${a.isFundedBy.value}</a><br>
+
+                    </div>
+                </div>`);
+        }
+    });
+
+}
+
 //************************insert the corresponding vocabulary description*********************************
 
 function insertProjCards(divID, projects, p) {
@@ -816,26 +906,29 @@ function insertConceptBrowser(divID, uri, offset) {
 
 function provideAll(divID, uri, offset) { //provide all available concepts for navigation
 
-    let query = encodeURIComponent(`PREFIX dcterms:<http://purl.org/dc/terms/>
-                                    PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
-                                    SELECT DISTINCT ?c (COALESCE(?l, ?lEN) AS ?Label) (COALESCE(?csl, ?cslEN) AS ?Title)
-                                    (COALESCE(?csd, ?csdEN, "") AS ?Desc) (EXISTS{?cs skos:hasTopConcept ?c} AS ?isTopConcept)
-                                    WHERE {
-                                    ?cs a skos:ConceptScheme; skos:hasTopConcept ?tc; dcterms:title ?cslEN . FILTER(lang(?cslEN)="en") .
-                                    <${uri}> skos:broader* ?tc . ?cs skos:hasTopConcept ?tc2 .
-                                    ?c skos:broader* ?tc2; skos:prefLabel ?lEN . FILTER(lang(?lEN)="en")
-                                    OPTIONAL {?c skos:prefLabel ?l . FILTER(lang(?l)="${USER_LANG}")}
-                                    OPTIONAL {?cs dcterms:title ?csl . FILTER(lang(?csl)="${USER_LANG}")}
-                                    OPTIONAL {?cs dcterms:description ?csd . FILTER(lang(?csd)="${USER_LANG}")}
-                                    OPTIONAL {?cs dcterms:description ?csdEN . FILTER(lang(?csdEN)="en")}
-                                    }
-                                    ORDER BY ?Label
-                                    LIMIT 50
-                                    OFFSET ${offset}`);
+    let query = encodeURIComponent(`prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                prefix version: <http://purl.org/linked-data/version#>
+                PREFIX dcterms:<http://purl.org/dc/terms/>
+                PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
+                SELECT DISTINCT ?c (COALESCE(?lEN, "") AS ?Label)
+                (COALESCE(?cslEN, "") AS ?Title)
+                (COALESCE(?csdEN, "") AS ?Desc)
+                (EXISTS{?c skos:topConceptOf ?cs} AS ?isTopConcept)
+                WHERE {
+                <${uri}> skos:broader* ?tc .
+                ?tc skos:topConceptOf ?cs .
+                ?cs version:currentVersion ?cx . ?cx rdfs:label ?cslEN . FILTER(lang(?cslEN)="en") .
+                ?tc2 skos:topConceptOf ?cs.
+                ?c skos:broader* ?tc2; skos:prefLabel ?lEN . FILTER(lang(?lEN)="en")
+                OPTIONAL {?cx dcterms:description ?csdEN . FILTER(lang(?csdEN)="en")}
+                }
+                ORDER BY ?Label
+                LIMIT 50
+                OFFSET ${offset}`);
 
-    fetch(ENDPOINT + '?query=' + query + '&format=application/json')
+    fetch(ENDPOINT + '?query=' + query + '&format=json')
         .then(res => res.json())
-        .then(jsonData => {
+        .then(jsonData => { //console.log(jsonData);
             let a = [];
             $('#' + divID).append('');
             $('#allConceptsHeader').html(jsonData.results.bindings[0].Title.value + ' (' + Number(offset + 1) + ' .. ' + Number(offset + jsonData.results.bindings.length) + ')');

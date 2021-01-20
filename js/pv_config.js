@@ -1,6 +1,16 @@
-let ENDPOINT = 'https://resource.geolba.ac.at/PoolParty/sparql/geoera';
+//let ENDPOINT = 'https://resource.geolba.ac.at/PoolParty/sparql/geoera';
+let ENDPOINT = 'https://data.geoscience.earth/ncl/system/query';
+let TOPREGISTERS = ['https://data.geoscience.earth/ncl/geoera'];
+let REG_EXCLUDE = []; //subregisters to exclude in PV viewer
+
 
 function addVocProj(vocProjects) {
+
+    //REMOVE acronym, title, description, project_page, rdf_download !!!
+    //ADD EGR uri like "https://data.geoscience.earth/ncl/project/26" for "EuroLithos"
+
+
+
 
     vocProjects.set('geoconnect3d', {
         acronym: 'GeoConnect³d',
@@ -47,15 +57,24 @@ function addVocProj(vocProjects) {
         rdf_download: ['muse.rdf', 'muse.trig']
     });
 
+
     vocProjects.set('eurolithos', {
         acronym: 'EuroLithos',
         title: 'European Ornamental stone resources',
-        description: 'Ornamental stone has contributed significantly in shaping our rural and urban landscapes, through its use in our built heritage from different historical periods. Ornamental stone is today a raw material produced with great skills all over Europe, exploiting the vast diversity of European natural stone resources. Yet, the actual use of local and regional stone resources in Europe is decreasing, and so is the knowledge of the resources, traditions and skills.',
+        description: 'EuroLithos',
         image: 'Eurolithos-logo.png',
         project_page: 'https://geoera.eu/projects/eurolithos1/',
         rdf_download: ['eurolithos.rdf', 'eurolithos.trig']
     });
 
+    vocProjects.set('graph', {
+        acronym: 'GRAPH',
+        title: 'GRAPH',
+        description: 'GRAPH',
+        image: 'geoera.png',
+        project_page: 'https://geoera.eu/projects/eurolithos1/',
+        rdf_download: ['eurolithos.rdf', 'eurolithos.trig']
+    });
 
     /*    vocProjects.set('keywords', {
             acronym: 'GIP-P keywords',
