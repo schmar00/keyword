@@ -29,7 +29,7 @@ $(document).ready(function () {
     } else {
         //insertPageDesc(); //general intro
         insertVocDesc(vocProjects, 'proj_desc');
-        setProjBox(['eurolithos','hike','hotlime','hover','muse'], 'proj_links');
+        setProjBox(['eurolithos', 'hike', 'hotlime', 'hover', 'muse'], 'proj_links');
         //insertProjCards('proj_links', vocProjects);
     }
     initSearch(Array.from(vocProjects.keys())); //provides js for fuse search
@@ -59,7 +59,7 @@ function insertVocDesc(vocProjects, divID) {
                         prefix reg: <http://purl.org/linked-data/registry#>
 
                         SELECT ?status ?projName ?cs ?Title ?Desc ?modified (COUNT(DISTINCT(?s)) AS ?count)
-                        (GROUP_CONCAT(DISTINCT ?L; separator = "|") as ?topConcepts)
+                        ((SUM(?x)/4) AS ?new) (GROUP_CONCAT(DISTINCT ?L; separator = "|") as ?topConcepts)
                         WHERE {
                           ?a dct:isVersionOf <${TOPREGISTERS[0]}>; reg:subregister ?proj.
                           ?b dct:isVersionOf ?proj; reg:subregister ?cs; rdfs:label ?projName .
@@ -72,6 +72,7 @@ function insertVocDesc(vocProjects, divID) {
                           #need for SKOS prefLabel
                           ?tc skos:topConceptOf ?cs; skos:narrower* ?s; skos:prefLabel ?tcl FILTER(lang(?tcl)="en")
                           BIND(CONCAT(STR(?tc),"$",STR(?tcl)) AS ?L)
+                          BIND(IF(strStarts(str(?s),str(?cs)),0,1) AS ?x)
                         }
                         GROUP BY ?projName ?cs ?Title ?Desc ?modified ?status`);
 
@@ -79,7 +80,7 @@ function insertVocDesc(vocProjects, divID) {
 
         .then(res => res.json())
         .then(jsonData => {
-            //console.log(jsonData.results.bindings);
+            console.log(jsonData.results.bindings);
             for (let [key, value] of vocProjects.entries()) {
                 let uri_path = new RegExp(key);
                 jsonData.results.bindings.filter(item => uri_path.test(item.cs.value)).forEach(function (item) {
@@ -98,6 +99,7 @@ function insertVocDesc(vocProjects, divID) {
                                             <strong>Top concepts:</strong> ${topConcepts}
                                             <br>
                                             <strong>Concepts:</strong> <span class="badge badge-info badge-pill">${item.count.value}</span>
+                                            ${(parseInt(item.new.value)>0)?('&nbsp;&nbsp;('+parseInt(item.new.value)+' in scheme)'):''}
                                             &nbsp;&nbsp;&nbsp;
                                             <strong>Modified:</strong> ${item.modified.value.split('T')[0]}
                                             &nbsp;&nbsp;&nbsp;
@@ -279,7 +281,7 @@ function search(searchText, vocProjects) {
                     }
                     ORDER BY ?sort
                     LIMIT 100`);
-console.log(decodeURIComponent(query));
+    console.log(decodeURIComponent(query));
     fetch(ENDPOINT + '?query=' + query + '&format=json')
         .then(res => res.json())
         .then(jsonData => { //console.log(jsonData);
@@ -777,7 +779,7 @@ function setUserLang(x) {
 //********************************************************************************************************
 function setProjBox(projAbbrev, divID) {
 
-       let query = encodeURIComponent(`prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    let query = encodeURIComponent(`prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                                         prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                                         prefix dct: <http://purl.org/dc/terms/>
                                         prefix foaf: <http://xmlns.com/foaf/0.1/>
@@ -811,8 +813,8 @@ function setProjBox(projAbbrev, divID) {
         .then(res => res.json())
         .then(jsonData => {
             //console.log(jsonData.results.bindings);
-        for (let a of jsonData.results.bindings) {
-            $('#' + divID).append(`
+            for (let a of jsonData.results.bindings) {
+                $('#' + divID).append(`
                 <div class="card my-4">
                     <h5 class="card-header">
                         <strong>${a.n.value}</strong> (${a.years.value})
@@ -826,8 +828,8 @@ function setProjBox(projAbbrev, divID) {
 
                     </div>
                 </div>`);
-        }
-    });
+            }
+        });
 
 }
 
