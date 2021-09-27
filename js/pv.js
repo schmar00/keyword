@@ -80,7 +80,7 @@ function insertVocDesc(vocProjects, divID) {
 
         .then(res => res.json())
         .then(jsonData => {
-            console.log(jsonData.results.bindings);
+            //console.log(jsonData.results.bindings);
             for (let [key, value] of vocProjects.entries()) {
                 let uri_path = new RegExp(key);
                 jsonData.results.bindings.filter(item => uri_path.test(item.cs.value)).forEach(function (item) {
@@ -94,17 +94,17 @@ function insertVocDesc(vocProjects, divID) {
                                             ${item.Title.value} (${value.acronym})
                                         </h4>
                                         ${item.Desc.value}
-                                        <br><br>
+                                        <br>
                                         <p class="text-muted">
                                             <strong>Top concepts:</strong> ${topConcepts}
                                             <br>
                                             <strong>Concepts:</strong> <span class="badge badge-info badge-pill">${item.count.value}</span>
-                                            ${(parseInt(item.new.value)>0)?('&nbsp;&nbsp;('+parseInt(item.new.value)+' in scheme)'):''}
+                                            ${(parseInt(item.new.value)>0)?('&nbsp;&nbsp;('+(parseInt(item.count.value)-parseInt(item.new.value))+' new)'):''}
                                             &nbsp;&nbsp;&nbsp;
                                             <strong>Modified:</strong> ${item.modified.value.split('T')[0]}
                                             &nbsp;&nbsp;&nbsp;
                                             <strong>Codelist:</strong> <a href="${ENDPOINT}?query=${encodeURIComponent(CODELIST_QUERY.replace(/§/g,item.cs.value))}&format=CSV">CSV</a>, <a href="${ENDPOINT}?query=${encodeURIComponent(CODELIST_QUERY.replace(/§/g,item.cs.value))}&format=TSV">TSV</a>
-                                            &nbsp;&nbsp;&nbsp;
+                                            <br>
                                             <strong>Status:</strong> ${item.status.value.replace('http://purl.org/linked-data/registry#status','')}
 
                                         </p>
@@ -817,13 +817,12 @@ function setProjBox(projAbbrev, divID) {
                 $('#' + divID).append(`
                 <div class="card my-4">
                     <h5 class="card-header">
-                        <strong>${a.n.value}</strong> (${a.years.value})
+                        <strong>${a.n.value}</strong> (${a.years.value}) 
+                        <a style="font-size:small; color:#719430;" href="${a.s.value}"><i class="fas fa-link"></i></a>
                     </h5>
                     <div class="card-body">
-                        subject: ${a.primaryTopic.value}<br>
-                        URI: <a href="${a.s.value}">${a.s.value}</a>
-                        ${a.Label.value}<br>
-                        Website: <a href="${a.page.value}">${a.page.value}</a><br>
+                        <strong>${a.primaryTopic.value}</strong> - ${a.Label.value}<br>
+                        <a href="${a.page.value}">${a.page.value}</a><br>
                         funded by: <a href="${a.cordis.value}">${a.isFundedBy.value}</a><br>
 
                     </div>
