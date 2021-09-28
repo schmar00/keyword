@@ -887,12 +887,12 @@ function insertConceptBrowser(divID, uri, offset) {
         <div class="card my-4">
             <ul id="coBr" class="pagination mb-4 cardHeaderRight">
                 <li>
-                    <button type="button" id="leftBtn" class="btn btn-outline-secondary btn-sm" onclick="provideAll('allConcepts', '${uri}', Number(this.value)-50)">
+                    <button type="button" id="leftBtn" class="btn btn-outline-dark btn-sm" onclick="provideAll('allConcepts', '${uri}', Number(this.value)-50)">
                         <i class="fas fa-caret-left fa-lg"></i>
                     </button>
                 </li>
                 <li>
-                    <button type="button" id="rightBtn" class="btn btn-outline-secondary btn-sm" onclick="provideAll('allConcepts', '${uri}', Number(this.value)+50)">
+                    <button type="button" id="rightBtn" class="btn btn-outline-dark btn-sm" onclick="provideAll('allConcepts', '${uri}', Number(this.value)+50)">
                         <i class="fas fa-caret-right fa-lg"></i>
                     </button>
                 </li>
