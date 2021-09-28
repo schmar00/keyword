@@ -788,6 +788,7 @@ function setProjBox(projAbbrev, divID) {
                                         prefix cerif: <http://purl.org/cerif/frapo/>
                                         prefix time: <http://www.w3.org/2006/time#>
                                         prefix reg: <http://purl.org/linked-data/registry#>
+                                        prefix dcat: <http://www.w3.org/ns/dcat#>
                                         prefix schema: <https://schema.org/>
                                         select ?s ?n (COALESCE(MIN(?L), "") AS ?Label)
                                         (COALESCE(MIN(?page1), "") AS ?page)
@@ -796,6 +797,7 @@ function setProjBox(projAbbrev, divID) {
                                         (COALESCE(MIN(?sameAs1), "") AS ?cordis)
                                         (COALESCE(MIN(?years1), "") AS ?years)
                                         (COALESCE(MIN(?isFundedBy1), "") AS ?isFundedBy)
+                                        (COALESCE(MIN(?accessService1), "") AS ?accessService)
                                         where {
                                         ?s a foaf:Project; skos:notation ?n; skos:prefLabel ?L .
                                         FILTER(lcase(?n)="${projAbbrev.join('" || lcase(?n)="')}")
@@ -805,6 +807,7 @@ function setProjBox(projAbbrev, divID) {
                                           OPTIONAL{?s schema:sameAs ?sameAs1}
                                           OPTIONAL{?s time:years ?years1}
                                           OPTIONAL{?s cerif:isFundedBy ?isFundedBy1}
+                                          OPTIONAL{?s dcat:accessService ?accessService1}
                                         }
                                         GROUP BY ?s ?n`);
 
@@ -813,18 +816,26 @@ function setProjBox(projAbbrev, divID) {
         .then(res => res.json())
         .then(jsonData => {
             //console.log(jsonData.results.bindings);
+
             for (let a of jsonData.results.bindings) {
+                let accessService = "";
+                if (a.accessService.value.length > 2) {
+                    accessService = `<a style="font-size:small; color:#719430;" 
+                                    href="${a.accessService.value}">
+                                    <i class="fas fa-desktop"></i>
+                                    </a>`;
+                }
                 $('#' + divID).append(`
                 <div class="card my-4">
                     <h5 class="card-header">
                         <strong>${a.n.value}</strong> (${a.years.value}) 
-                        <a style="font-size:small; color:#719430;" href="${a.s.value}"><i class="fas fa-link"></i></a>
+                        <a style="font-size:small; color:#719430;" href="${a.s.value}"><i class="fas fa-link"></i></a>&nbsp
+                        ${accessService}
                     </h5>
                     <div class="card-body">
                         <strong>${a.primaryTopic.value}</strong> - ${a.Label.value}<br>
                         <a href="${a.page.value}">${a.page.value}</a><br>
                         funded by: <a href="${a.cordis.value}">${a.isFundedBy.value}</a><br>
-
                     </div>
                 </div>`);
             }
