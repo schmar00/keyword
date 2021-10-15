@@ -29,7 +29,7 @@ $(document).ready(function () {
     } else {
         //insertPageDesc(); //general intro
         insertVocDesc(vocProjects, 'proj_desc');
-        setProjBox(['eurolithos', 'hike', 'hotlime', 'hover', 'muse'], 'proj_links');
+        setProjBox(['keyword'], 'proj_links');
         //insertProjCards('proj_links', vocProjects);
     }
     initSearch(Array.from(vocProjects.keys())); //provides js for fuse search
@@ -209,7 +209,7 @@ function initSearch(projectArr) {
     let query = encodeURIComponent(`PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
                                     PREFIX dcterms:<http://purl.org/dc/terms/>
                                     PREFIX rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                                    SELECT ?s ?L
+                                    SELECT DISTINCT ?s ?L
                                     WHERE {
                                     VALUES ?p {skos:prefLabel skos:altLabel}
                                     ?cs a skos:ConceptScheme . FILTER(regex(str(?cs),"${projectArr.join('") || regex(str(?cs),"')}")) .
