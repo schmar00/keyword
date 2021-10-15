@@ -275,7 +275,7 @@ function search(searchText, vocProjects) {
                     VALUES ?n {"${sparqlEncode(searchText.toLowerCase())}"}
                     VALUES ?p {skos:prefLabel skos:altLabel skos:definition skos:scopeNote}
                     ?s a skos:Concept; ?p ?l; skos:prefLabel ?title .
-                    FILTER(!regex(str(?s),"keyword") && regex(?l,?n,"i") && lang(?title)="en")
+                    FILTER(regex(str(?s),"keyword") && regex(?l,?n,"i") && lang(?title)="en")
                     BIND(CONCAT(STR(?p),"|",STR(?l)) AS ?text)
                     BIND(IF(?p=skos:prefLabel,1,2) AS ?sort)
                     }
